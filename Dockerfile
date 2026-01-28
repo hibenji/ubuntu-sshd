@@ -1,4 +1,4 @@
-# Use an official Ubuntu base image
+# Use an official Ubuntu base image [cite: 1]
 FROM ubuntu:24.04
 
 # Set environment variables to avoid interactive prompts during installation
@@ -6,9 +6,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV SSH_USERNAME="ubuntu"
 ENV SSHD_CONFIG_ADDITIONAL=""
 
-# Install OpenSSH server, clean up, create directories, set permissions, and configure SSH
+# Install OpenSSH server, curl (for node setup), clean up, and configure SSH
+# ADDED: curl, nodejs, and @angular/cli installation
 RUN apt-get update \
-    && apt-get install -y iproute2 iputils-ping openssh-server telnet \
+    && apt-get install -y iproute2 iputils-ping openssh-server telnet curl gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get install -y git \
+    && npm install -g @angular/cli \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /run/sshd \

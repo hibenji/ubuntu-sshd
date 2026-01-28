@@ -2,9 +2,13 @@
 
 set -e
 
-: ${SSHD_CONFIG_ADDITIONAL:=""}
+# Default to SSH_USERNAME if SSH_USERNAMES is not set, otherwise default to "ubuntu"
+if [ -z "$SSH_USERNAMES" ]; then
+    SSH_USERNAMES="${SSH_USERNAME:-ubuntu}"
+fi
 
-USERS=("benji" "steffi" "edi")
+# Convert comma-separated or space-separated list to an array
+IFS=' ,' read -r -a USERS <<< "$SSH_USERNAMES"
 
 # Ensure sudo is installed (important for minimal images)
 if ! command -v sudo >/dev/null 2>&1; then
@@ -52,14 +56,32 @@ create_user() {
     fi
 }
 
+# Track if any user has SSH keys to decide on password authentication
+ANY_KEYS_PROVIDED=false
+
 # Create users
-for USER in "${USERS[@]}"; do
-    create_user "$USER"
+for USERNAME in "${USERS[@]}"; do
+    USERNAME=$(echo "$USERNAME" | xargs) # trim whitespace
+    [ -z "$USERNAME" ] && continue
+    
+    create_user "$USERNAME"
+    
+    # Check if this user had keys provided
+    KEYS_VAR="${USERNAME^^}_AUTHORIZED_KEYS"
+    if [ -n "${!KEYS_VAR}" ]; then
+        ANY_KEYS_PROVIDED=true
+    fi
 done
 
-# Disable password authentication if any SSH keys were provided
-if [ -n "$BENJI_AUTHORIZED_KEYS" ] || [ -n "$ROMAN_AUTHORIZED_KEYS" ]; then
+# Also check the legacy AUTHORIZED_KEYS if SSH_USERNAME was used
+if [ -n "$AUTHORIZED_KEYS" ]; then
+    ANY_KEYS_PROVIDED=true
+fi
+
+# Disable password authentication if any SSH keys were provided for security
+if [ "$ANY_KEYS_PROVIDED" = true ]; then
     sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+    echo "SSH keys detected: Password authentication disabled."
 fi
 
 # Apply additional SSHD configuration if provided
